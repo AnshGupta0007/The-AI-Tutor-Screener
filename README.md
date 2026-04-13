@@ -6,6 +6,56 @@ An AI-powered voice interviewer that conducts 10-minute screening calls with tut
 
 ---
 
+## Quick start — how to test end to end
+
+### 1. Install and run
+```bash
+npm install
+cp .env.example .env.local   # fill in keys (see bottom of this file)
+npm run dev                  # starts at http://localhost:3000
+```
+
+### 2. Create an admin account
+Go to your Supabase project → Authentication → Users → **Add user**  
+Use any email + password. That account is your admin login.
+
+### 3. Sign in as admin
+```
+http://localhost:3000/admin/login
+```
+Email + password from step 2.
+
+### 4. Invite a candidate
+On the admin dashboard click **+ Invite Candidate**, enter a name and email.  
+Copy the **6-digit access code** shown (or check the email if Resend is configured).
+
+### 5. Take the interview as a candidate
+Open a new tab (or incognito window):
+```
+http://localhost:3000
+```
+Enter the email and code from step 4, confirm your name, and complete the ~10-minute voice interview.  
+Allow microphone access when the browser asks.
+
+### 6. Evaluate and review
+Back in the admin tab, refresh the dashboard.  
+The session will show status **Evaluated** — click **View report →** to see scores, radar chart, transcript, and recordings.
+
+### 7. Send decision
+On the report page scroll to **Hiring Decision** and click **Accept** or **Reject** to send the candidate an email.
+
+### Page routes at a glance
+| Path | Who uses it |
+|------|-------------|
+| `/` | Candidate — enter invite code |
+| `/interview/[sessionId]` | Candidate — live voice interview |
+| `/report/[sessionId]` | Candidate — thank-you / next steps |
+| `/admin/login` | Admin — sign in |
+| `/admin` | Admin — pipeline dashboard |
+| `/admin/report/[sessionId]` | Admin — full evaluation report |
+
+---
+
 ## What it does
 
 1. **Admin invites a candidate** — enters their name + email, system sends a 6-digit access code
