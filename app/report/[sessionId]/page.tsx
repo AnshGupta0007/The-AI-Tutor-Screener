@@ -195,7 +195,7 @@ export default function CandidateReportPage() {
                         className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-medium"
                         style={{ backgroundColor: status === 'accepted' ? '#DCFCE7' : '#FEE2E2', color: status === 'accepted' ? '#15803D' : '#991B1B' }}
                       >
-                        {status === 'accepted' ? '🎉 You've been shortlisted!' : 'Decision sent — check your email'}
+                        {status === 'accepted' ? '🎉 You\'ve been shortlisted!' : 'Decision sent — check your email'}
                       </div>
                     )}
                   </div>
