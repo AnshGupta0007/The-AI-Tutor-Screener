@@ -50,6 +50,21 @@ export async function GET(
         }
       }
 
+      // Compute percentile rank among all evaluated sessions
+      let percentile: number | null = null
+      let totalEvaluated = 0
+      if (evaluation?.composite_score != null) {
+        const { data: allScores } = await supabase
+          .from('evaluations')
+          .select('composite_score')
+          .not('composite_score', 'is', null)
+        if (allScores && allScores.length > 0) {
+          totalEvaluated = allScores.length
+          const below = allScores.filter(e => e.composite_score < evaluation.composite_score).length
+          percentile = Math.round((below / allScores.length) * 100)
+        }
+      }
+
       return NextResponse.json({
         session: {
           id: session.id,
@@ -83,6 +98,8 @@ export async function GET(
           confidence: m.confidence,
         })),
         recordingAvailable,
+        percentile,
+        totalEvaluated,
       })
     } else {
       // Candidate view — no scores, no evaluation data

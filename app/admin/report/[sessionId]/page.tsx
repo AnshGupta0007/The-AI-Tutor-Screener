@@ -34,6 +34,8 @@ interface AdminReportData {
   } | null
   transcript: ConversationMessage[]
   recordingAvailable: boolean
+  percentile: number | null
+  totalEvaluated: number
 }
 
 const DIMENSIONS = [
@@ -48,6 +50,20 @@ const RECOMMENDATION_STYLES: Record<string, { label: string; bg: string; text: s
   strong_hire: { label: 'Strong Hire', bg: '#DCFCE7', text: '#15803D', icon: '✅' },
   consider: { label: 'Consider', bg: '#FEF9C3', text: '#854D0E', icon: '🟡' },
   do_not_advance: { label: 'Do Not Advance', bg: '#FEE2E2', text: '#991B1B', icon: '❌' },
+}
+
+const FILLERS = ['um', 'uh', 'like', 'you know', 'basically', 'right', 'actually', 'literally']
+function analyzeSpeech(transcript: ConversationMessage[]) {
+  const userMsgs = transcript.filter(m => m.role === 'user')
+  if (!userMsgs.length) return null
+  const allText = userMsgs.map(m => m.content.toLowerCase()).join(' ')
+  const words = allText.split(/\s+/).filter(Boolean)
+  const fillerCount = FILLERS.reduce((acc, f) => {
+    return acc + (allText.match(new RegExp(`\\b${f.replace(' ', '\\s+')}\\b`, 'g')) || []).length
+  }, 0)
+  const avgWords = Math.round(words.length / userMsgs.length)
+  const fillerRate = words.length > 0 ? +((fillerCount / words.length) * 100).toFixed(1) : 0
+  return { totalWords: words.length, avgWordsPerResponse: avgWords, fillerCount, fillerRate, responses: userMsgs.length }
 }
 
 function ScoreBar({ score, label, weight }: { score: number; label: string; weight: string }) {
@@ -657,6 +673,14 @@ export default function AdminReportPage() {
                   {evaluation.compositeScore.toFixed(2)}
                   <span className="text-base font-normal ml-1" style={{ color: 'var(--text-muted)' }}>/5.0</span>
                 </div>
+                {report.percentile !== null && report.totalEvaluated >= 2 && (
+                  <div
+                    className="text-xs font-semibold px-3 py-1 rounded-full"
+                    style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}
+                  >
+                    Top {100 - report.percentile}% of {report.totalEvaluated} candidates
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -792,6 +816,37 @@ export default function AdminReportPage() {
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No flags raised.</p>
               )}
             </div>
+
+            {/* Speech Signals */}
+            {(() => {
+              const sp = analyzeSpeech(transcript)
+              if (!sp) return null
+              const fillerRisk = sp.fillerRate > 8 ? { label: 'High', color: 'var(--danger)', bg: '#FEE2E2' }
+                : sp.fillerRate > 4 ? { label: 'Moderate', color: 'var(--warning)', bg: '#FEF9C3' }
+                : { label: 'Low', color: 'var(--success)', bg: '#DCFCE7' }
+              const paceLabel = sp.avgWordsPerResponse > 120 ? 'Detailed' : sp.avgWordsPerResponse > 60 ? 'Balanced' : 'Concise'
+              return (
+                <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
+                  <h2 className="text-xs font-semibold tracking-widest mb-4" style={{ color: 'var(--text-muted)' }}>SPEECH SIGNALS</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      { label: 'Total Words', value: sp.totalWords.toLocaleString(), sub: `across ${sp.responses} answers` },
+                      { label: 'Avg per Answer', value: `${sp.avgWordsPerResponse}`, sub: paceLabel },
+                      { label: 'Filler Words', value: sp.fillerCount.toString(), sub: `${sp.fillerRate}% of speech` },
+                      { label: 'Filler Risk', value: fillerRisk.label, sub: '< 4% is ideal', valueBg: fillerRisk.bg, valueColor: fillerRisk.color },
+                    ].map(stat => (
+                      <div key={stat.label} className="rounded-xl p-3.5" style={{ backgroundColor: 'var(--bg-primary)' }}>
+                        <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>{stat.label}</p>
+                        <p className="text-xl font-bold mb-0.5" style={{ color: stat.valueColor ?? 'var(--text-primary)' }}>
+                          {stat.value}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--text-subtle)' }}>{stat.sub}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Summary */}
             {evaluation.summary && (

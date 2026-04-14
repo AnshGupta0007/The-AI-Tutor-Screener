@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 import { getServiceClient, getAuthClient } from '@/lib/supabase'
+
+function getTransporter() {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  })
+}
 
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000))
@@ -12,15 +22,14 @@ async function sendInviteEmail(
   code: string,
   appUrl: string
 ): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) return false
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return false
 
   const firstName = candidateName.split(' ')[0]
 
   try {
-    const resend = new Resend(apiKey)
-    const { error } = await resend.emails.send({
-      from: 'Cuemath Hiring <onboarding@resend.dev>',
+    const transporter = getTransporter()
+    await transporter.sendMail({
+      from: `"Cuemath Hiring" <${process.env.GMAIL_USER}>`,
       to,
       subject: 'Congratulations! You\'ve been selected for the Cuemath AI Screening Round',
       html: `
@@ -124,7 +133,7 @@ async function sendInviteEmail(
 </html>
       `,
     })
-    return !error
+    return true
   } catch {
     return false
   }

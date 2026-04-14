@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 import { getServiceClient, getAuthClient } from '@/lib/supabase'
+
+function getTransporter() {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  })
+}
 
 async function sendDecisionEmail(
   to: string,
   candidateName: string,
   decision: 'accept' | 'reject'
 ): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) return false
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return false
 
   const firstName = candidateName.split(' ')[0]
 
@@ -155,14 +164,14 @@ async function sendDecisionEmail(
 </html>`
 
   try {
-    const resend = new Resend(apiKey)
-    const { error } = await resend.emails.send({
-      from: 'Cuemath Hiring <onboarding@resend.dev>',
+    const transporter = getTransporter()
+    await transporter.sendMail({
+      from: `"Cuemath Hiring" <${process.env.GMAIL_USER}>`,
       to,
       subject,
       html: bodyHtml,
     })
-    return !error
+    return true
   } catch {
     return false
   }
