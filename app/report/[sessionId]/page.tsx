@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { formatDate, formatDuration } from '@/lib/utils'
 
@@ -11,76 +11,19 @@ interface SessionInfo {
   questionsAnswered: number
 }
 
-type AppStatus = 'pending' | 'active' | 'completed' | 'evaluated' | 'abandoned' | 'accepted' | 'rejected'
-
-function getStatusStep(status: AppStatus): 0 | 1 | 2 {
-  if (status === 'accepted' || status === 'rejected') return 2
-  if (status === 'evaluated' || status === 'completed') return 1
-  return 0
-}
-
-const STATUS_STEPS = [
-  {
-    key: 'submitted',
-    label: 'Screening submitted',
-    body: 'Your voice responses have been recorded and saved securely.',
-  },
-  {
-    key: 'review',
-    label: 'Under review',
-    body: 'Our AI is evaluating your responses. The hiring team will review the report.',
-  },
-  {
-    key: 'decision',
-    label: 'Decision sent',
-    body: 'The hiring team has reached a decision and an email has been sent to you.',
-  },
-]
-
 export default function CandidateReportPage() {
   const params = useParams()
   const sessionId = params.sessionId as string
   const [session, setSession] = useState<SessionInfo | null>(null)
-  const [status, setStatus] = useState<AppStatus>('completed')
-  const stoppedRef = useRef(false)
 
   useEffect(() => {
-    stoppedRef.current = false
-
-    async function fetchStatus() {
-      try {
-        const r = await fetch(`/api/report/${sessionId}`, { cache: 'no-store' })
-        if (!r.ok) return
-        const data = await r.json()
-        if (data?.session) setSession(data.session)
-        const s = data?.status as AppStatus | undefined
-        if (s) {
-          setStatus(s)
-          if (s === 'accepted' || s === 'rejected') stoppedRef.current = true
-        }
-      } catch { /* silent */ }
-    }
-
-    fetchStatus()
-
-    const interval = setInterval(() => {
-      if (!stoppedRef.current) fetchStatus()
-      else clearInterval(interval)
-    }, 3000)
-
-    function onVisible() {
-      if (!stoppedRef.current && document.visibilityState === 'visible') fetchStatus()
-    }
-    document.addEventListener('visibilitychange', onVisible)
-
-    return () => {
-      clearInterval(interval)
-      document.removeEventListener('visibilitychange', onVisible)
-    }
+    fetch(`/api/report/${sessionId}`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.session) setSession(data.session) })
+      .catch(() => {})
   }, [sessionId])
 
   const firstName = session?.candidateName?.split(' ')[0] ?? ''
-  const currentStep = getStatusStep(status)
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -101,8 +44,9 @@ export default function CandidateReportPage() {
       </header>
 
       <div className="max-w-lg mx-auto px-4 py-14">
+
         {/* Hero */}
-        <div className="text-center mb-10 animate-slide-up">
+        <div className="text-center mb-8 animate-slide-up">
           <div className="relative inline-flex mb-5">
             <div
               className="w-20 h-20 rounded-full flex items-center justify-center"
@@ -114,99 +58,71 @@ export default function CandidateReportPage() {
             </div>
             <div className="absolute inset-0 rounded-full" style={{ border: '2px solid #22C55E', opacity: 0.3 }} />
           </div>
+
           <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
             {firstName ? `Well done, ${firstName}!` : 'Interview complete!'}
           </h1>
           <p className="text-base leading-relaxed" style={{ color: 'var(--text-muted)', maxWidth: 340, margin: '0 auto' }}>
-            Your screening is complete. Track its progress below.
+            Your screening has been successfully submitted.
           </p>
         </div>
 
-        {/* Status tracker */}
+        {/* What's next card */}
         <div
           className="rounded-2xl overflow-hidden mb-4"
           style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-sm)' }}
         >
-          <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-                Application status
-              </p>
-              {currentStep < 2 && (
-                <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-subtle)' }}>
-                  <span
-                    className="inline-block w-1.5 h-1.5 rounded-full"
-                    style={{ backgroundColor: 'var(--accent)', animation: 'speaking-pulse 2s ease-in-out infinite' }}
-                  />
-                  Live
-                </span>
-              )}
-            </div>
+          <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>What happens next</p>
           </div>
 
-          <div className="p-5 space-y-0">
-            {STATUS_STEPS.map((step, i) => {
-              const done = i < currentStep
-              const active = i === currentStep
-              const future = i > currentStep
-              const isLast = i === STATUS_STEPS.length - 1
-
-              const dotColor = done ? '#16A34A' : active ? 'var(--accent)' : 'var(--border-medium)'
-              const labelColor = future ? 'var(--text-subtle)' : 'var(--text-primary)'
-              const bodyColor = future ? 'var(--text-subtle)' : 'var(--text-muted)'
-
-              return (
-                <div key={step.key} className="flex gap-4">
-                  {/* Dot + line */}
-                  <div className="flex flex-col items-center" style={{ width: 24 }}>
-                    <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: done ? '#DCFCE7' : active ? 'var(--accent-light)' : 'var(--bg-primary)', border: `2px solid ${dotColor}` }}
-                    >
-                      {done ? (
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="#16A34A" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : active ? (
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--accent)' }} />
-                      ) : null}
-                    </div>
-                    {!isLast && (
-                      <div
-                        className="w-0.5 flex-1 my-1"
-                        style={{ backgroundColor: done ? '#BBF7D0' : 'var(--border-subtle)', minHeight: 24 }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="pb-5" style={{ paddingBottom: isLast ? 0 : 20 }}>
-                    <p className="text-sm font-semibold mb-0.5" style={{ color: labelColor }}>{step.label}</p>
-                    <p className="text-xs leading-relaxed" style={{ color: bodyColor }}>{step.body}</p>
-                    {active && step.key === 'review' && (
-                      <div
-                        className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-medium"
-                        style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}
-                      >
-                        <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Processing
-                      </div>
-                    )}
-                    {active && step.key === 'decision' && (
-                      <div
-                        className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-medium"
-                        style={{ backgroundColor: status === 'accepted' ? '#DCFCE7' : '#FEE2E2', color: status === 'accepted' ? '#15803D' : '#991B1B' }}
-                      >
-                        {status === 'accepted' ? '🎉 You\'ve been shortlisted!' : 'Decision sent — check your email'}
-                      </div>
-                    )}
-                  </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+            {[
+              {
+                icon: (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15M14.25 3.104c.251.023.501.05.75.082M19.8 15l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.5-1.57.393" />
+                  </svg>
+                ),
+                title: 'AI evaluation underway',
+                body: 'Your responses are being scored across 5 teaching dimensions by our AI system.',
+              },
+              {
+                icon: (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+                ),
+                title: 'Human review',
+                body: 'The Cuemath hiring team will review the AI report before making a decision.',
+              },
+              {
+                icon: (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                  </svg>
+                ),
+                title: 'You'll hear from us',
+                body: 'Expect an email from the Cuemath team within 2–3 business days with your outcome.',
+              },
+            ].map((step, i, arr) => (
+              <div
+                key={step.title}
+                className="flex items-start gap-4 px-5 py-4"
+                style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}
+              >
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                  style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}
+                >
+                  {step.icon}
                 </div>
-              )
-            })}
+                <div>
+                  <p className="text-sm font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>{step.title}</p>
+                  <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>{step.body}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -230,16 +146,18 @@ export default function CandidateReportPage() {
                   <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatDuration(session.duration)}</p>
                 </div>
               )}
-              <div>
-                <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Responses</p>
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{session.questionsAnswered > 0 ? `${session.questionsAnswered} answered` : '—'}</p>
-              </div>
+              {session.questionsAnswered > 0 && (
+                <div>
+                  <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Responses</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{session.questionsAnswered}</p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         <p className="text-center text-xs mt-8" style={{ color: 'var(--text-subtle)' }}>
-          {currentStep < 2 ? 'This page updates automatically. You can keep it open.' : 'Check your email for details. Good luck!'}
+          You can close this tab. Good luck!
         </p>
       </div>
     </div>
