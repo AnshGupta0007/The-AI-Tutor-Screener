@@ -60,10 +60,11 @@ export async function GET(
           .from('evaluations')
           .select('composite_score')
           .not('composite_score', 'is', null)
-        if (allScores && allScores.length > 0) {
+        if (allScores && allScores.length > 1) {
           totalEvaluated = allScores.length
+          const others = allScores.length - 1
           const below = allScores.filter(e => e.composite_score < evaluation.composite_score).length
-          percentile = Math.round((below / allScores.length) * 100)
+          percentile = Math.round((below / others) * 100)
         }
       }
 
