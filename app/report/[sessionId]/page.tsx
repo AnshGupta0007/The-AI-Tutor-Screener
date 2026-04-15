@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { formatDate, formatDuration } from '@/lib/utils'
 
@@ -42,9 +42,10 @@ export default function CandidateReportPage() {
   const sessionId = params.sessionId as string
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [status, setStatus] = useState<AppStatus>('completed')
+  const stoppedRef = useRef(false)
 
   useEffect(() => {
-    let stopped = false
+    stoppedRef.current = false
 
     async function fetchStatus() {
       try {
@@ -52,24 +53,23 @@ export default function CandidateReportPage() {
         if (!r.ok) return
         const data = await r.json()
         if (data?.session) setSession(data.session)
-        if (data?.status) {
-          setStatus(data.status as AppStatus)
-          if (data.status === 'accepted' || data.status === 'rejected') stopped = true
+        const s = data?.status as AppStatus | undefined
+        if (s) {
+          setStatus(s)
+          if (s === 'accepted' || s === 'rejected') stoppedRef.current = true
         }
       } catch { /* silent */ }
     }
 
     fetchStatus()
 
-    // Poll every 4s until decision is sent
     const interval = setInterval(() => {
-      if (!stopped) fetchStatus()
+      if (!stoppedRef.current) fetchStatus()
       else clearInterval(interval)
-    }, 4000)
+    }, 3000)
 
-    // Also refetch immediately when user switches back to this tab
     function onVisible() {
-      if (!stopped && document.visibilityState === 'visible') fetchStatus()
+      if (!stoppedRef.current && document.visibilityState === 'visible') fetchStatus()
     }
     document.addEventListener('visibilitychange', onVisible)
 

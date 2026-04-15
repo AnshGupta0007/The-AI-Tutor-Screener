@@ -1067,7 +1067,7 @@ export default function InterviewPage() {
               Question {questionsAsked.length + 1}
             </span>
           )}
-          {turnTimeLeft !== null && isMicActive && (
+          {turnTimeLeft !== null && (
             <span
               className="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg"
               style={{
