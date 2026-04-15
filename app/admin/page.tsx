@@ -58,6 +58,8 @@ export default function AdminDashboard() {
   const [signingOut, setSigningOut] = useState(false)
   const [search, setSearch] = useState('')
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'accepted' | 'rejected' | 'evaluated'>('all')
+  const [minScore, setMinScore] = useState(0)
   const [stats, setStats] = useState<{
     total: number; completed: number; evaluated: number;
     avgScore: number | null; passRate: number | null; recentCount: number;
@@ -165,6 +167,23 @@ export default function AdminDashboard() {
   }
 
   const filtered = sessions
+    .filter(s => {
+      if (statusFilter === 'pending') return s.status === 'pending'
+      if (statusFilter === 'accepted') return s.status === 'accepted'
+      if (statusFilter === 'rejected') return s.status === 'rejected'
+      if (statusFilter === 'evaluated') return s.status === 'evaluated' || s.status === 'completed'
+      return true
+    })
+    .filter(s => {
+      if (minScore === 0) return true
+      const score = s.evaluations?.[0]?.composite_score
+      return score != null && score >= minScore
+    })
+    .sort((a, b) => {
+      const sa = a.evaluations?.[0]?.composite_score ?? -1
+      const sb = b.evaluations?.[0]?.composite_score ?? -1
+      return sb - sa
+    })
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -243,18 +262,80 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Interview Pipeline
-          </h1>
-          <input
-            type="text"
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); loadSessions(1, e.target.value) }}
-            placeholder="Search by name or email..."
-            className="h-9 px-3 rounded-lg border text-sm outline-none w-64"
-            style={{ borderColor: 'var(--border-subtle)', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)' }}
-          />
+        {/* Toolbar */}
+        <div className="mb-5 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Interview Pipeline
+            </h1>
+            <input
+              type="text"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); loadSessions(1, e.target.value) }}
+              placeholder="Search by name or email..."
+              className="h-9 px-3 rounded-lg border text-sm outline-none w-56"
+              style={{ borderColor: 'var(--border-subtle)', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+            />
+          </div>
+
+          {/* Status filter pills */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {([
+              { key: 'all',       label: 'All' },
+              { key: 'pending',   label: 'Pending' },
+              { key: 'evaluated', label: 'Awaiting Decision' },
+              { key: 'accepted',  label: 'Selected' },
+              { key: 'rejected',  label: 'Rejected' },
+            ] as const).map(f => (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full border transition-all"
+                style={{
+                  backgroundColor: statusFilter === f.key ? 'var(--accent)' : 'var(--bg-surface)',
+                  color: statusFilter === f.key ? 'white' : 'var(--text-muted)',
+                  borderColor: statusFilter === f.key ? 'var(--accent)' : 'var(--border-subtle)',
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Score slider — only shown when evaluated candidates exist */}
+          {sessions.some(s => s.evaluations?.[0]?.composite_score != null) && (
+            <div
+              className="flex items-center gap-4 px-4 py-3 rounded-xl"
+              style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}
+            >
+              <span className="text-xs font-semibold shrink-0" style={{ color: 'var(--text-muted)' }}>Min Score</span>
+              <input
+                type="range"
+                min={0}
+                max={5}
+                step={0.5}
+                value={minScore}
+                onChange={e => setMinScore(Number(e.target.value))}
+                className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
+                style={{ accentColor: 'var(--accent)' }}
+              />
+              <span
+                className="text-sm font-bold w-10 text-right shrink-0"
+                style={{ color: minScore > 0 ? 'var(--accent)' : 'var(--text-muted)' }}
+              >
+                {minScore > 0 ? `≥${minScore}` : 'Any'}
+              </span>
+              {minScore > 0 && (
+                <button
+                  onClick={() => setMinScore(0)}
+                  className="text-xs shrink-0"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {error && (
