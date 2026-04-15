@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, getAuthClient } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const authClient = await getAuthClient()
@@ -15,6 +17,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(url.searchParams.get('page') || '1', 10)
     const limit = 20
     const offset = (page - 1) * limit
+    const searchParam = url.searchParams.get('search') || ''
 
     // Auto-abandon sessions stuck in 'active' for more than 90 minutes
     const staleThreshold = new Date(Date.now() - 90 * 60 * 1000).toISOString()
@@ -24,22 +27,10 @@ export async function GET(request: NextRequest) {
       .eq('status', 'active')
       .lt('started_at', staleThreshold)
 
-    const searchParam = url.searchParams.get('search') || ''
-
+    // Fetch sessions (no join)
     let query = supabase
       .from('sessions')
-      .select(`
-        id,
-        candidate_name,
-        candidate_email,
-        status,
-        started_at,
-        ended_at,
-        created_at,
-        invite_code,
-        completion_pct,
-        evaluations ( composite_score, recommendation )
-      `, { count: 'exact' })
+      .select('id, candidate_name, candidate_email, status, started_at, ended_at, created_at, invite_code, completion_pct', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -48,32 +39,52 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: sessions, error, count } = await query
-
     if (error) {
       return NextResponse.json({ error: 'Could not load sessions.' }, { status: 500 })
     }
 
-    // Compute percentile for each evaluated session
+    const sessionIds = (sessions || []).map(s => s.id)
+
+    // Fetch evaluations separately for these sessions
+    const { data: evaluations } = sessionIds.length > 0
+      ? await supabase
+          .from('evaluations')
+          .select('session_id, composite_score, recommendation')
+          .in('session_id', sessionIds)
+      : { data: [] }
+
+    // Fetch ALL scores for percentile computation
     const { data: allScores } = await supabase
       .from('evaluations')
       .select('composite_score')
       .not('composite_score', 'is', null)
 
     const scores = (allScores || []).map(e => e.composite_score as number)
-    const others = scores.length - 1
+    const totalEvaluated = scores.length
 
-    const sessionsWithPercentile = (sessions || []).map(s => {
-      const score = (s.evaluations as Array<{ composite_score: number | null; recommendation: string | null }>)?.[0]?.composite_score
+    // Build eval map
+    const evalMap: Record<string, { composite_score: number | null; recommendation: string | null }> = {}
+    for (const e of (evaluations || [])) {
+      evalMap[e.session_id] = { composite_score: e.composite_score, recommendation: e.recommendation }
+    }
+
+    // Merge + compute percentile
+    const merged = (sessions || []).map(s => {
+      const ev = evalMap[s.id] ?? null
       let percentile: number | null = null
-      if (score != null && others > 0) {
-        const below = scores.filter(x => x < score).length
-        percentile = Math.round((below / others) * 100)
+      if (ev?.composite_score != null && totalEvaluated > 1) {
+        const below = scores.filter(x => x < ev.composite_score!).length
+        percentile = Math.round((below / (totalEvaluated - 1)) * 100)
       }
-      return { ...s, percentile }
+      return {
+        ...s,
+        evaluations: ev ? [ev] : [],
+        percentile,
+      }
     })
 
     return NextResponse.json({
-      sessions: sessionsWithPercentile,
+      sessions: merged,
       total: count || 0,
       page,
       totalPages: Math.ceil((count || 0) / limit),
