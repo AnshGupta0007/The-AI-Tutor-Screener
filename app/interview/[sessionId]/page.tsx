@@ -96,6 +96,7 @@ export default function InterviewPage() {
   const [questionsAsked, setQuestionsAsked] = useState<string[]>([])
   const [consecutiveSkips, setConsecutiveSkips] = useState(0)
   const [isCompleting, setIsCompleting] = useState(false) // shows "please don't close" overlay
+  const [turnTimeLeft, setTurnTimeLeft] = useState<number | null>(null) // per-question countdown (90s)
 
   // Refs — audio/recording
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -113,6 +114,7 @@ export default function InterviewPage() {
   const repeatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pauseModalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const turnCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Refs — interview state
   const currentAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -299,6 +301,8 @@ export default function InterviewPage() {
     if (rambleTimerRef.current)     clearTimeout(rambleTimerRef.current)
     if (repeatTimerRef.current)     clearTimeout(repeatTimerRef.current)
     if (pauseModalTimerRef.current) clearTimeout(pauseModalTimerRef.current)
+    if (turnCountdownRef.current)   { clearInterval(turnCountdownRef.current); turnCountdownRef.current = null }
+    setTurnTimeLeft(null)
   }
 
   // ─── Speech Synthesis ─────────────────────────────────────────────────────
@@ -404,6 +408,22 @@ export default function InterviewPage() {
     showPauseModalRef.current = false
     setPauseCountdown(SMART_PAUSE_COUNTDOWN_SECS)
     setCurrentPartialTranscript('')
+
+    // ── Per-question hard limit: 90 seconds ──────────────────────────────────
+    const TURN_LIMIT = 90
+    setTurnTimeLeft(TURN_LIMIT)
+    if (turnCountdownRef.current) clearInterval(turnCountdownRef.current)
+    let remaining = TURN_LIMIT
+    turnCountdownRef.current = setInterval(() => {
+      remaining -= 1
+      setTurnTimeLeft(remaining)
+      if (remaining <= 0) {
+        if (turnCountdownRef.current) { clearInterval(turnCountdownRef.current); turnCountdownRef.current = null }
+        setTurnTimeLeft(null)
+        // Force-submit even if candidate is still speaking
+        if (!isProcessingTurnRef.current) handleDoneAnswering()
+      }
+    }, 1000)
 
     // ── SpeechRecognition: real-time display + speech/silence detection ──
     // Works independently of AudioContext state. Chrome/Safari only; Firefox falls back
@@ -1045,6 +1065,18 @@ export default function InterviewPage() {
               style={{ backgroundColor: 'var(--bg-ai-message)', color: 'var(--accent)' }}
             >
               Question {questionsAsked.length + 1}
+            </span>
+          )}
+          {turnTimeLeft !== null && isMicActive && (
+            <span
+              className="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg"
+              style={{
+                backgroundColor: turnTimeLeft <= 20 ? '#FEF2F2' : turnTimeLeft <= 45 ? '#FEF9C3' : 'var(--bg-primary)',
+                color: turnTimeLeft <= 20 ? 'var(--danger)' : turnTimeLeft <= 45 ? '#854D0E' : 'var(--text-muted)',
+              }}
+              title="Time remaining for this answer"
+            >
+              {String(Math.floor(turnTimeLeft / 60)).padStart(2, '0')}:{String(turnTimeLeft % 60).padStart(2, '0')}
             </span>
           )}
           {timeLeft !== null && phase !== 'ended' && (

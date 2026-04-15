@@ -213,7 +213,7 @@ export default function AdminReportPage() {
 
     for (const msg of transcript.filter(m => m.role !== 'system')) {
       const speaker = msg.role === 'assistant' ? 'AI INTERVIEWER' : 'CANDIDATE'
-      const turnTag = msg.turnNumber != null ? ` [turn ${msg.turnNumber}]` : ''
+      const turnTag = ''
       const confTag = msg.role === 'user' && msg.confidence != null && msg.confidence < 0.6 ? ' [low confidence]' : ''
       lines.push(`${speaker}${turnTag}${confTag}`)
       lines.push(msg.content)
@@ -247,7 +247,7 @@ export default function AdminReportPage() {
           <div style="margin-bottom:16px;">
             <div style="font-size:11px;font-weight:700;color:${isAI ? '#5B4CF5' : '#059669'};
               text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">
-              ${isAI ? 'AI Interviewer' : 'Candidate'}${m.turnNumber != null ? ` · turn ${m.turnNumber}` : ''}
+              ${isAI ? 'AI Interviewer' : 'Candidate'}
               ${lowConf ? '<span style="color:#D97706;font-size:10px;"> · unclear audio</span>' : ''}
             </div>
             <div style="font-size:13px;line-height:1.6;color:#1a1a2e;
@@ -1063,7 +1063,6 @@ export default function AdminReportPage() {
                         style={{ color: 'var(--text-muted)' }}
                       >
                         {isAI ? 'Cuemath AI' : 'Candidate'}
-                        {msg.turnNumber != null && <span className="ml-1.5 opacity-60">#{msg.turnNumber}</span>}
                       </p>
                       <div
                         className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${isAI ? 'rounded-tl-sm' : 'rounded-tr-sm'}`}
