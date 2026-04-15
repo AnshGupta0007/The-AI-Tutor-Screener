@@ -14,6 +14,7 @@ interface SessionRow {
   created_at: string
   invite_code: string | null
   completion_pct: number | null
+  percentile: number | null
   evaluations: Array<{ composite_score: number | null; recommendation: string | null }>
 }
 
@@ -59,7 +60,8 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('')
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'accepted' | 'rejected' | 'evaluated'>('all')
-  const [minScore, setMinScore] = useState(0)
+  const [pctMin, setPctMin] = useState(0)
+  const [pctMax, setPctMax] = useState(100)
   const [stats, setStats] = useState<{
     total: number; completed: number; evaluated: number;
     avgScore: number | null; passRate: number | null; recentCount: number;
@@ -175,9 +177,9 @@ export default function AdminDashboard() {
       return true
     })
     .filter(s => {
-      if (minScore === 0) return true
-      const score = s.evaluations?.[0]?.composite_score
-      return score != null && score >= minScore
+      if (pctMin === 0 && pctMax === 100) return true
+      if (s.percentile == null) return false
+      return s.percentile >= pctMin && s.percentile <= pctMax
     })
     .sort((a, b) => {
       const sa = a.evaluations?.[0]?.composite_score ?? -1
@@ -302,38 +304,35 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          {/* Score slider — only shown when evaluated candidates exist */}
-          {sessions.some(s => s.evaluations?.[0]?.composite_score != null) && (
+          {/* Percentile range slider — only shown when 2+ evaluated candidates exist */}
+          {sessions.filter(s => s.percentile != null).length >= 2 && (
             <div
-              className="flex items-center gap-4 px-4 py-3 rounded-xl"
+              className="px-4 py-3 rounded-xl"
               style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}
             >
-              <span className="text-xs font-semibold shrink-0" style={{ color: 'var(--text-muted)' }}>Min Score</span>
-              <input
-                type="range"
-                min={0}
-                max={5}
-                step={0.5}
-                value={minScore}
-                onChange={e => setMinScore(Number(e.target.value))}
-                className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
-                style={{ accentColor: 'var(--accent)' }}
-              />
-              <span
-                className="text-sm font-bold w-10 text-right shrink-0"
-                style={{ color: minScore > 0 ? 'var(--accent)' : 'var(--text-muted)' }}
-              >
-                {minScore > 0 ? `≥${minScore}` : 'Any'}
-              </span>
-              {minScore > 0 && (
-                <button
-                  onClick={() => setMinScore(0)}
-                  className="text-xs shrink-0"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  ✕
-                </button>
-              )}
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Percentile Range</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-md" style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}>
+                    {pctMin}% – {pctMax}%
+                  </span>
+                  {(pctMin > 0 || pctMax < 100) && (
+                    <button onClick={() => { setPctMin(0); setPctMax(100) }} className="text-xs" style={{ color: 'var(--text-muted)' }}>Reset</button>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs w-8 shrink-0 text-right" style={{ color: 'var(--text-subtle)' }}>0%</span>
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <input type="range" min={0} max={100} step={5} value={pctMin}
+                    onChange={e => setPctMin(Math.min(Number(e.target.value), pctMax - 5))}
+                    className="w-full cursor-pointer" style={{ accentColor: 'var(--accent)' }} />
+                  <input type="range" min={0} max={100} step={5} value={pctMax}
+                    onChange={e => setPctMax(Math.max(Number(e.target.value), pctMin + 5))}
+                    className="w-full cursor-pointer" style={{ accentColor: '#8B5CF6' }} />
+                </div>
+                <span className="text-xs w-8 shrink-0" style={{ color: 'var(--text-subtle)' }}>100%</span>
+              </div>
             </div>
           )}
         </div>
@@ -377,7 +376,7 @@ export default function AdminDashboard() {
             <table className="w-full">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  {['Candidate', 'Date', 'Status', 'Duration', 'Completion', 'Score', 'Recommendation', ''].map(h => (
+                  {['Candidate', 'Date', 'Status', 'Duration', 'Score', 'Percentile', 'Recommendation', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wide" style={{ color: 'var(--text-muted)' }}>
                       {h}
                     </th>
@@ -417,28 +416,20 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-muted)' }}>
                         {formatDuration(s.started_at, s.ended_at)}
                       </td>
-                      <td className="px-4 py-3">
-                        {(s.status === 'completed' || s.status === 'evaluated') && s.completion_pct != null ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-subtle)' }}>
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${s.completion_pct}%`,
-                                  backgroundColor: s.completion_pct === 100 ? '#16A34A' : s.completion_pct >= 50 ? '#F59E0B' : '#DC2626',
-                                }}
-                              />
-                            </div>
-                            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                              {s.completion_pct}%
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
+                      <td className="px-4 py-3 text-sm font-semibold" style={{ color: eval0?.composite_score != null ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        {eval0?.composite_score != null ? (
+                          <span style={{ color: eval0.composite_score >= 4 ? 'var(--success)' : eval0.composite_score >= 3 ? 'var(--warning)' : 'var(--danger)' }}>
+                            {eval0.composite_score.toFixed(2)}
+                          </span>
+                        ) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {eval0?.composite_score != null ? eval0.composite_score.toFixed(2) : '—'}
+                      <td className="px-4 py-3">
+                        {s.percentile != null ? (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                            style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}>
+                            Top {s.percentile === 100 ? 1 : 100 - s.percentile}%
+                          </span>
+                        ) : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>}
                       </td>
                       <td className="px-4 py-3">
                         {recStyle ? (

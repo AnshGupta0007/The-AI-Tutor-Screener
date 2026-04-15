@@ -3,7 +3,6 @@ import { getServiceClient, getAuthClient } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
   try {
-    // Admin-only
     const authClient = await getAuthClient()
     const { data: { user } } = await authClient.auth.getUser()
     if (!user) {
@@ -54,8 +53,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Could not load sessions.' }, { status: 500 })
     }
 
+    // Compute percentile for each evaluated session
+    const { data: allScores } = await supabase
+      .from('evaluations')
+      .select('composite_score')
+      .not('composite_score', 'is', null)
+
+    const scores = (allScores || []).map(e => e.composite_score as number)
+    const others = scores.length - 1
+
+    const sessionsWithPercentile = (sessions || []).map(s => {
+      const score = (s.evaluations as Array<{ composite_score: number | null; recommendation: string | null }>)?.[0]?.composite_score
+      let percentile: number | null = null
+      if (score != null && others > 0) {
+        const below = scores.filter(x => x < score).length
+        percentile = Math.round((below / others) * 100)
+      }
+      return { ...s, percentile }
+    })
+
     return NextResponse.json({
-      sessions: sessions || [],
+      sessions: sessionsWithPercentile,
       total: count || 0,
       page,
       totalPages: Math.ceil((count || 0) / limit),
