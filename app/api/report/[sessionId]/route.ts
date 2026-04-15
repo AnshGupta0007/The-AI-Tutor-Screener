@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, getAuthClient } from '@/lib/supabase'
 import { differenceInDays } from '@/lib/utils'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }

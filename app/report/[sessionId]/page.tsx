@@ -49,7 +49,7 @@ export default function CandidateReportPage() {
 
     async function fetchStatus() {
       try {
-        const r = await fetch(`/api/report/${sessionId}`)
+        const r = await fetch(`/api/report/${sessionId}`, { cache: 'no-store' })
         if (!r.ok) return
         const data = await r.json()
         if (data?.session) setSession(data.session)
@@ -232,7 +232,7 @@ export default function CandidateReportPage() {
               )}
               <div>
                 <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Responses</p>
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{session.questionsAnswered} answered</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{session.questionsAnswered > 0 ? `${session.questionsAnswered} answered` : '—'}</p>
               </div>
             </div>
           </div>
