@@ -20,7 +20,7 @@ const CX = 140
 const CY = 148
 const R  = 96   // outer pentagon radius
 const N  = 5
-const LABEL_R = R + 26  // label distance from center
+const LABEL_R = R + 30  // label distance from center
 
 // Angle for each vertex: start at top (−π/2), go clockwise
 function angle(i: number) {
@@ -77,10 +77,11 @@ export default function RadarChart({ dimensions, compositeScore }: Props) {
   })
 
   return (
-    <div className="relative">
+    <div className="relative" style={{ padding: '4px 28px' }}>
       <svg
         viewBox="0 0 280 290"
         width="100%"
+        overflow="visible"
         style={{ maxWidth: 300, display: 'block', margin: '0 auto' }}
         aria-label="Radar chart of evaluation dimensions"
       >

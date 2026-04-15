@@ -1044,7 +1044,7 @@ export default function InterviewPage() {
               className="text-xs font-medium px-2.5 py-1 rounded-lg"
               style={{ backgroundColor: 'var(--bg-ai-message)', color: 'var(--accent)' }}
             >
-              Q {Math.min(questionsAsked.length + 1, sessionState.coreQuestionIds.length)}&nbsp;/&nbsp;{sessionState.coreQuestionIds.length}
+              Question {questionsAsked.length + 1}
             </span>
           )}
           {timeLeft !== null && phase !== 'ended' && (

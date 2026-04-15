@@ -44,34 +44,39 @@ export default function CandidateReportPage() {
   const [status, setStatus] = useState<AppStatus>('completed')
 
   useEffect(() => {
+    let stopped = false
+
     async function fetchStatus() {
       try {
         const r = await fetch(`/api/report/${sessionId}`)
         if (!r.ok) return
         const data = await r.json()
         if (data?.session) setSession(data.session)
-        if (data?.status) setStatus(data.status as AppStatus)
+        if (data?.status) {
+          setStatus(data.status as AppStatus)
+          if (data.status === 'accepted' || data.status === 'rejected') stopped = true
+        }
       } catch { /* silent */ }
     }
 
     fetchStatus()
 
-    // Poll every 10s until decision is sent
-    const interval = setInterval(async () => {
-      try {
-        const r = await fetch(`/api/report/${sessionId}`)
-        if (!r.ok) return
-        const data = await r.json()
-        if (data?.status) {
-          setStatus(data.status as AppStatus)
-          if (data.status === 'accepted' || data.status === 'rejected') {
-            clearInterval(interval)
-          }
-        }
-      } catch { /* silent */ }
-    }, 10_000)
+    // Poll every 4s until decision is sent
+    const interval = setInterval(() => {
+      if (!stopped) fetchStatus()
+      else clearInterval(interval)
+    }, 4000)
 
-    return () => clearInterval(interval)
+    // Also refetch immediately when user switches back to this tab
+    function onVisible() {
+      if (!stopped && document.visibilityState === 'visible') fetchStatus()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [sessionId])
 
   const firstName = session?.candidateName?.split(' ')[0] ?? ''
@@ -226,8 +231,8 @@ export default function CandidateReportPage() {
                 </div>
               )}
               <div>
-                <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Questions</p>
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{session.questionsAnswered}</p>
+                <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Responses</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{session.questionsAnswered} answered</p>
               </div>
             </div>
           </div>
