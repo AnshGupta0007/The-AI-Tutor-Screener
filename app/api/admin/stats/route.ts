@@ -41,8 +41,12 @@ export async function GET() {
     }
 
     const avgScore = scoredCount > 0 ? Math.round((totalScore / scoredCount) * 100) / 100 : null
-    const passCount = recCounts.strong_hire + recCounts.consider
-    const passRate = scoredCount > 0 ? Math.round((passCount / scoredCount) * 100) : null
+
+    // Pass rate = admin decisions only (accepted / (accepted + rejected))
+    const acceptedCount = counts.accepted ?? 0
+    const rejectedCount = counts.rejected ?? 0
+    const decidedCount = acceptedCount + rejectedCount
+    const passRate = decidedCount > 0 ? Math.round((acceptedCount / decidedCount) * 100) : null
 
     // Sessions created in last 7 days
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()

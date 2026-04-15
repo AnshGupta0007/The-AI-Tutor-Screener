@@ -678,7 +678,7 @@ export default function AdminReportPage() {
                     className="text-xs font-semibold px-3 py-1 rounded-full"
                     style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}
                   >
-                    Top {100 - report.percentile}% of {report.totalEvaluated} candidates
+                    Better than {report.percentile}% of {report.totalEvaluated} candidates
                   </div>
                 )}
               </div>
