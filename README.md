@@ -2,7 +2,7 @@
 
 An AI-powered voice interviewer that conducts 10-minute screening calls with tutor candidates, evaluates their soft skills, and gives hiring managers a structured recommendation — without a human on the call.
 
-**Live demo:** [your-url-here]
+**Live demo:** https://the-ai-tutor-screener-ej36.vercel.app
 
 ---
 
