@@ -1,4 +1,4 @@
-# Cuemath AI Tutor Screener
+# AI Tutor Screener
 
 An AI-powered voice interviewer that conducts 10-minute screening calls with tutor candidates, evaluates their soft skills, and gives hiring managers a structured recommendation — without a human on the call.
 
